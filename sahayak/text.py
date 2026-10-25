@@ -158,9 +158,11 @@ def _medicine_paragraph(index: int, med: Medicine) -> str:
         when = slots[0] if len(slots) == 1 else f"{', '.join(slots[:-1])}, and again {slots[-1]}"
     else:
         when = ", ".join(p for p in (med.frequency, food) if p)
-    parts = [p for p in (when, f"for {med.duration}" if med.duration else "") if p]
     take = f"Take {med.dosage or 'it'}"
-    sentences.append(_sentence(f"{take} {', '.join(parts)}" if parts else take))
+    sentences.append(_sentence(f"{take} {when}" if when else take))
+    if med.duration:
+        # Its own sentence, so translation can't attach it to just one of the times above.
+        sentences.append(_sentence(f"Take it for {med.duration}"))
 
     if not med.dosage:
         sentences.append("The amount is not clear on the prescription, so please check with your pharmacist.")

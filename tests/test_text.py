@@ -79,7 +79,7 @@ def test_spoken_script_is_conversational_and_faithful():
     assert "Dr. Anita Sharma" in paragraphs[0]
     assert "The doctor has written viral fever and acute pharyngitis." in paragraphs[0]
     assert "You have 4 medicines. Let us go through them one by one." in script
-    assert "The first one is Dolo 650. Take 1 tablet in the morning after food, and again at night after food, for 5 days." in script
+    assert "The first one is Dolo 650. Take 1 tablet in the morning after food, and again at night after food. Take it for 5 days." in script
     assert "Take 10 millilitre in the morning, in the afternoon, and again at night." in script
     # No time of day is written for Pantop, so the script must say so instead of guessing.
     assert ("The third one is Pantop, 40 milligram. Take 1 tablet once a day, before food (empty stomach). "

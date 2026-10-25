@@ -32,7 +32,7 @@ The browser runs these four steps in order, so the user sees real progress. If t
 
 ### How the voice explanation is made
 
-The app explains the prescription the way a pharmacist would at the counter. It greets the patient by name and goes through each medicine in turn. It ties every dose to the daily routine ("1 tablet in the morning after food, and again at night after food, for 5 days"). It ends with a short recap grouped by time of day.
+The app explains the prescription the way a pharmacist would at the counter. It greets the patient by name and goes through each medicine in turn. It ties every dose to the daily routine ("1 tablet in the morning after food, and again at night after food. Take it for 5 days."). It ends with a short recap grouped by time of day.
 
 - **No invented facts.** The script is assembled in code (`sahayak/text.py`) from the extracted facts, not written freely by an LLM. In testing, a free-form LLM script invented timings and stated what medicines were for. Building the script in code means doses, timings and durations can't be invented or dropped. If the time of day isn't written, the script says so and tells the patient to ask their pharmacist.
 - **Everyday speech.** Translation uses Sarvam's `mayura:v1` in modern-colloquial mode. This gives natural phrasing with the English words people actually use ("1 tablet सुबह खाने के बाद… 5 days तक लें"), and keeps medicine names exactly as written. The output is not formal textbook language.
