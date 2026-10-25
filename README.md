@@ -2,6 +2,8 @@
 
 **Understand your doctor's prescription — in your own language.**
 
+**Live app:** https://sarvam-prescription-agent.vercel.app
+
 Prescription Sahayak is a mobile-first web app. A patient photographs a handwritten prescription. The app reads it, lists each medicine with dose, frequency, timing and duration, then reads the instructions aloud in one of 11 Indian languages.
 
 The app is built on the [Sarvam AI](https://www.sarvam.ai) platform and deploys to [Vercel](https://vercel.com).
