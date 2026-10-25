@@ -6,13 +6,18 @@ from dataclasses import dataclass
 
 # --- Sarvam models -----------------------------------------------------------
 LLM_MODEL = "sarvam-105b"
-TRANSLATE_MODEL = "sarvam-translate:v1"
+# mayura:v1 in modern-colloquial mode gives everyday spoken phrasing (natural code-mixing,
+# medicine names kept as written) and covers all 11 languages below.
+TRANSLATE_MODEL = "mayura:v1"
+TRANSLATE_MODE = "modern-colloquial"
+TRANSLATE_FALLBACK_MODEL = "sarvam-translate:v1"  # formal register; used if mayura fails
 TTS_MODEL = "bulbul:v4-flash"
 # bulbul:v4-flash has no personas for Malayalam or Odia yet; those use v3.
 TTS_FALLBACK_MODEL = "bulbul:v3"
 
 # --- Limits (kept below the documented API maximums) --------------------------
-TRANSLATE_CHUNK_CHARS = 1800  # sarvam-translate:v1 max is 2000
+TRANSLATE_CHUNK_CHARS = 900  # mayura:v1 max is 1000
+TRANSLATE_WORKERS = 6
 TTS_CHUNK_CHARS = 2000  # bulbul v3 / v4-flash max is 2500
 LLM_MAX_TOKENS = 4096
 TTS_SAMPLE_RATE = 22050
@@ -61,7 +66,7 @@ LANGUAGES: tuple[Language, ...] = (
     )),
     Language("bn-IN", "Bengali", "বাংলা", ("roopa_bn_conversational", "arnab_bn_conversation")),
     Language("mr-IN", "Marathi", "मराठी", (
-        "nilesh_mr_conversation", "ishita_mr_conversational", "neha_mr_narration", "soham_mr_narration",
+        "ishita_mr_conversational", "nilesh_mr_conversation", "neha_mr_narration", "soham_mr_narration",
     )),
     Language("ta-IN", "Tamil", "தமிழ்", ("gokul_ta_narration", "vijay_ta_narration")),
     Language("te-IN", "Telugu", "తెలుగు", (
@@ -81,6 +86,30 @@ LANGUAGES: tuple[Language, ...] = (
 )
 
 LANGUAGES_BY_CODE: dict[str, Language] = {lang.code: lang for lang in LANGUAGES}
+
+
+# Speaker genders as documented in Sarvam's Bulbul voice catalog (v3 male/female lists;
+# v4 personas reuse these names). Used so translations use matching first-person forms
+# (e.g. Hindi "समझाती हूँ" vs "समझाता हूँ"). Undocumented names are left unset.
+_MALE_VOICES = frozenset({
+    "aayan", "aditya", "advait", "amit", "anand", "ashutosh", "dev", "gokul", "kabir", "manan",
+    "mani", "mohit", "rahul", "ratan", "rehan", "rohan", "shubh", "soham", "sumit", "sunny",
+    "tarun", "varun", "vijay",
+})
+_FEMALE_VOICES = frozenset({
+    "ishita", "kavitha", "kavya", "neha", "pooja", "priya", "ritu", "roopa", "rupali", "shreya",
+    "shruti", "simran", "suhani", "tanya",
+})
+
+
+def voice_gender(voice_id: str | None) -> str | None:
+    """'ritu_hi_medical' -> 'Female'; unknown or undocumented voices -> None."""
+    name = (voice_id or "").split("_")[0].lower()
+    if name in _MALE_VOICES:
+        return "Male"
+    if name in _FEMALE_VOICES:
+        return "Female"
+    return None
 
 
 def voice_label(voice_id: str) -> str:

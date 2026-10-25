@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+# Times of day a dose can be tied to; used for the spoken daily-routine recap.
+SCHEDULE_SLOTS = ("morning", "afternoon", "evening", "night", "bedtime")
+
 
 def _opt_str(value: Any) -> str | None:
     if value is None:
@@ -32,6 +35,8 @@ class Medicine:
     timing: str | None = None
     duration: str | None = None
     instructions: str | None = None
+    schedule: list[str] = field(default_factory=list)  # subset of SCHEDULE_SLOTS
+    as_needed: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Medicine | None":
@@ -46,6 +51,11 @@ class Medicine:
             timing=_opt_str(data.get("timing")),
             duration=_opt_str(data.get("duration")),
             instructions=_opt_str(data.get("instructions")),
+            schedule=[
+                slot for slot in dict.fromkeys(s.lower() for s in _str_list(data.get("schedule")))
+                if slot in SCHEDULE_SLOTS
+            ],
+            as_needed=data.get("as_needed") is True,
         )
 
 

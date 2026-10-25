@@ -1,7 +1,8 @@
 import pytest
 
+from sahayak.config import voice_gender
 from sahayak.models import Medicine, Prescription
-from sahayak.text import build_patient_summary, chunk_text, extract_json
+from sahayak.text import build_spoken_script, chunk_text, daily_routine, extract_json, speakable
 
 
 def test_extract_json_handles_fences_and_think_blocks():
@@ -30,21 +31,79 @@ def test_chunk_text_splits_overlong_line():
     assert len(chunks) > 1 and all(len(c) <= 300 for c in chunks)
 
 
-def test_summary_mentions_every_medicine_and_safety_note():
-    rx = Prescription(
+def test_speakable_expands_units_and_slashes():
+    assert speakable("650 mg, 10ml, 5 mcg, review / SOS") == "650 milligram, 10 millilitre, 5 microgram, review or SOS"
+    assert speakable("Mgnesium") == "Mgnesium"
+
+
+def test_voice_gender_uses_documented_names_only():
+    assert voice_gender("ritu_hi_medical") == "Female"
+    assert voice_gender("gokul_ta_narration") == "Male"
+    assert voice_gender("chaitra_kn_conversation") is None
+    assert voice_gender(None) is None
+
+
+def _sample() -> Prescription:
+    return Prescription(
+        patient_name="Ramesh Kumar",
         doctor_name="Anita Sharma",
-        date="12/10/2026",
-        diagnosis=["Viral fever"],
+        diagnosis=["Viral fever", "Acute pharyngitis"],
         medicines=[
-            Medicine(name="Dolo 650", strength="650 mg", dosage="1 tablet",
-                     frequency="twice a day", timing="after food", duration="5 days"),
-            Medicine(name="Pantop", strength="40 mg", dosage="1 tablet", frequency="once a day"),
+            Medicine(name="Dolo 650", strength="650 mg", dosage="1 tablet", timing="after food",
+                     duration="5 days", schedule=["morning", "night"]),
+            Medicine(name="Ascoril LS", dosage="10 ml", frequency="three times a day",
+                     schedule=["morning", "afternoon", "night"]),
+            Medicine(name="Pantop", strength="40 mg", dosage="1 tablet", frequency="once a day",
+                     timing="before food (empty stomach)"),
+            Medicine(name="Ondem", dosage="1 tablet", as_needed=True),
         ],
+        tests=["CBC", "CRP"],
         advice=["Plenty of fluids", "Warm saline gargles"],
+        follow_up="Review after 5 days / SOS",
     )
-    summary = build_patient_summary(rx)
-    assert "Dr. Anita Sharma" in summary
-    assert "Medicine 1: Dolo 650. Take 1 tablet, twice a day, after food, for 5 days." in summary
-    assert "Medicine 2: Pantop 40 mg." in summary
-    assert "Doctor's advice: Plenty of fluids. Warm saline gargles." in summary
-    assert summary.endswith("before taking any medicine.")
+
+
+def test_daily_routine_only_uses_explicit_schedules():
+    routine = daily_routine(_sample())
+    assert routine == {
+        "morning": {"after food": ["Dolo 650"], "food timing not written": ["Ascoril LS"]},
+        "afternoon": {"food timing not written": ["Ascoril LS"]},
+        "night": {"after food": ["Dolo 650"], "food timing not written": ["Ascoril LS"]},
+    }  # Pantop has no time of day and Ondem is as-needed: neither is placed in a slot
+
+
+def test_spoken_script_is_conversational_and_faithful():
+    script = build_spoken_script(_sample())
+    paragraphs = script.split("\n\n")
+    assert paragraphs[0].startswith("Namaste Ramesh Kumar ji.")
+    assert "Dr. Anita Sharma" in paragraphs[0]
+    assert "The doctor has written viral fever and acute pharyngitis." in paragraphs[0]
+    assert "You have 4 medicines. Let us go through them one by one." in script
+    assert "The first one is Dolo 650. Take 1 tablet in the morning after food, and again at night after food, for 5 days." in script
+    assert "Take 10 millilitre in the morning, in the afternoon, and again at night." in script
+    # No time of day is written for Pantop, so the script must say so instead of guessing.
+    assert ("The third one is Pantop, 40 milligram. Take 1 tablet once a day, before food (empty stomach). "
+            "The time of day is not written") in script
+    assert "Take 1 tablet only when you need it." in script
+    assert "The doctor has also advised plenty of fluids and warm saline gargles." in script
+    assert "the doctor has written: Review after 5 days or SOS." in script
+    recap = next(p for p in paragraphs if p.startswith("Let me repeat it once"))
+    assert "In the morning, after food, take Dolo 650. Also take Ascoril LS." in recap
+    assert "Pantop" not in recap
+    assert "Take Ondem only when you need it." in recap
+    assert paragraphs[-1].endswith("get well soon.")
+    assert " mg" not in script and " ml" not in script
+
+
+def test_spoken_script_handles_missing_details():
+    rx = Prescription(medicines=[Medicine(name="Vitamin D3")])
+    script = build_spoken_script(rx)
+    assert script.startswith("Namaste. I have gone through your prescription")
+    assert "You have one medicine." in script
+    assert "The amount is not clear on the prescription" in script
+    assert "How often to take it is not clear" in script
+    assert "Let me repeat it once" not in script
+
+
+def test_spoken_script_without_medicines():
+    assert "I could not find any medicines" in build_spoken_script(Prescription())

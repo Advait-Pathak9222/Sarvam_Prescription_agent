@@ -1,4 +1,4 @@
-"""Sarvam AI pipeline: Vision (digitise) -> LLM (structure) -> Translate -> TTS."""
+"""Sarvam AI pipeline: Vision (digitise) -> LLM (structure) -> Translate (colloquial) -> TTS."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import logging
 import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import Any
 
@@ -19,7 +20,7 @@ from .config import Language
 from .errors import SahayakError
 from .media import PreparedDocument
 from .models import Prescription
-from .text import chunk_text, extract_json
+from .text import chunk_text, extract_json, split_paragraphs
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,11 @@ TDS/TID = three times a day, QID = four times a day, HS = at bedtime, SOS = only
 STAT = immediately, AC = before food, PC = after food, 1-0-1 = once in the morning and once at night, \
 1-1-1 = morning, afternoon and night, x 5d = for 5 days, Tab = tablet, Cap = capsule, Syp = syrup.
 - If a value is unclear or illegible, set it to null and describe the problem in "uncertain".
+- Fill "schedule" ONLY when the time of day is explicit: 1-0-1 or BD = ["morning", "night"]; \
+1-1-1 or TDS = ["morning", "afternoon", "night"]; 0-0-1 = ["night"]; 1-0-0 = ["morning"]; \
+HS = ["bedtime"]; a written time of day counts too. Otherwise leave it []. For example \
+"Tab Pantop 40 OD AC (empty stomach)" has schedule [] because no time of day is written: \
+"before food" or "empty stomach" is NOT a time of day.
 - Ignore printed clinic boilerplate (phone numbers, registration numbers, addresses).
 
 Respond with a single JSON object and nothing else, using exactly this shape:
@@ -53,7 +59,9 @@ Respond with a single JSON object and nothing else, using exactly this shape:
       "frequency": string | null,// plain English, e.g. "twice a day (morning and night)"
       "timing": string | null,   // e.g. "after food"
       "duration": string | null, // e.g. "5 days"
-      "instructions": string | null
+      "instructions": string | null,
+      "schedule": [string],      // times of day, only from: "morning", "afternoon", "evening", "night", "bedtime"
+      "as_needed": boolean       // true only for SOS / "when needed" medicines
     }
   ],
   "tests": [string],
@@ -61,6 +69,7 @@ Respond with a single JSON object and nothing else, using exactly this shape:
   "follow_up": string | null,
   "uncertain": [string]
 }"""
+
 
 
 def _api_error_message(step: str, exc: ApiError) -> str:
@@ -172,21 +181,46 @@ class PrescriptionPipeline:
         return Prescription.from_dict(data)
 
     # 3. Translation -----------------------------------------------------------
-    def translate(self, text: str, target: str) -> str:
-        """Translate English text to the target language with sarvam-translate."""
+    def translate(self, text: str, target: str, speaker_gender: str | None = None) -> str:
+        """Translate the English script into everyday spoken language.
+
+        Uses mayura:v1 in modern-colloquial mode, one paragraph per request (in parallel)
+        so paragraph breaks survive for display and TTS chunking. Falls back to the formal
+        sarvam-translate model if mayura fails.
+        """
         if target == "en-IN":
             return text
-        translated: list[str] = []
-        with _step("translation"):
-            for chunk in chunk_text(text, config.TRANSLATE_CHUNK_CHARS):
-                response = self._client.text.translate(
-                    input=chunk,
-                    source_language_code="en-IN",
-                    target_language_code=target,
-                    model=config.TRANSLATE_MODEL,
-                )
-                translated.append(response.translated_text)
-        return "\n".join(translated)
+        pieces = [
+            chunk
+            for paragraph in split_paragraphs(text)
+            for chunk in chunk_text(paragraph, config.TRANSLATE_CHUNK_CHARS)
+        ]
+        try:
+            translated = self._translate_pieces(pieces, target, speaker_gender, colloquial=True)
+        except SahayakError:
+            logger.warning("Colloquial translation failed for %s; using formal model", target)
+            translated = self._translate_pieces(pieces, target, speaker_gender, colloquial=False)
+        return "\n\n".join(translated)
+
+    def _translate_pieces(
+        self, pieces: list[str], target: str, speaker_gender: str | None, *, colloquial: bool
+    ) -> list[str]:
+        options: dict[str, Any] = (
+            {"model": config.TRANSLATE_MODEL, "mode": config.TRANSLATE_MODE}
+            if colloquial
+            else {"model": config.TRANSLATE_FALLBACK_MODEL}
+        )
+        if speaker_gender:
+            options["speaker_gender"] = speaker_gender
+
+        def one(piece: str) -> str:
+            response = self._client.text.translate(
+                input=piece, source_language_code="en-IN", target_language_code=target, **options
+            )
+            return response.translated_text.strip()
+
+        with _step("translation"), ThreadPoolExecutor(max_workers=config.TRANSLATE_WORKERS) as pool:
+            return list(pool.map(one, pieces))
 
     # 4. Text-to-speech --------------------------------------------------------
     def synthesize(self, text: str, language: Language, voice: str, pace: float = 1.0) -> bytes:

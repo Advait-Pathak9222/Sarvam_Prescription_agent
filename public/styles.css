@@ -336,9 +336,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
 .listen-status { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 0.92rem; }
 
-.summary { display: grid; gap: 10px; font-size: 1.08rem; line-height: 1.75; }
-.summary p { padding-left: 14px; border-left: 3px solid var(--brand-soft); }
-.summary p:first-child, .summary p:last-child { border-left-color: transparent; padding-left: 0; }
+.summary { display: grid; gap: 14px; font-size: 1.08rem; line-height: 1.8; max-width: 68ch; }
 .summary p:last-child { color: var(--text-muted); font-size: 0.98rem; }
 .summary.is-stale { opacity: 0.45; }
 

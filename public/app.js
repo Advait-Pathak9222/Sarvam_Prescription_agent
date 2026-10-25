@@ -409,11 +409,13 @@
     const voice = lang === els.language.value ? els.voice.value : language.voices[0].id;
     const pace = getPace();
 
-    let text = state.translations.get(lang);
+    // Keyed by voice too: the translation matches the speaker's gender in first-person phrases.
+    const textKey = `${lang}|${voice}`;
+    let text = state.translations.get(textKey);
     if (!text) {
       hooks.onTranslate?.();
-      text = (await (await postJSON("/api/translate", { text: state.summaryEn, target: lang })).json()).text;
-      state.translations.set(lang, text);
+      text = (await (await postJSON("/api/translate", { text: state.summaryEn, target: lang, voice })).json()).text;
+      state.translations.set(textKey, text);
     }
 
     const key = `${lang}|${voice}|${pace}`;

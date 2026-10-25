@@ -15,20 +15,28 @@ The app is built on the [Sarvam AI](https://www.sarvam.ai) platform and deploys 
 ## How it works
 
 ```
- Photo / PDF ──► Sarvam Vision ──► Sarvam LLM ──► Sarvam Translate ──► Bulbul TTS ──► Audio + text
-                 (doc_ai.digitise)  (sarvam-105b)   (sarvam-translate:v1) (bulbul:v4-flash)
-                 handwriting OCR    medicines,      English summary →      spoken MP3
-                                    dosage, diagnosis  patient's language
+ Photo / PDF ──► Sarvam Vision ──► Sarvam LLM ──► Spoken script ──► Sarvam Translate ──► Bulbul TTS
+                 (doc_ai.digitise)  (sarvam-105b)   (built in code)   (mayura:v1,           (bulbul:v4-flash)
+                 handwriting OCR    medicines,      warm pharmacist-  modern-colloquial)    spoken MP3
+                                    dosage, schedule style explanation everyday language
 ```
 
 | Step | Endpoint | Sarvam API |
 |------|----------|------------|
 | 1. Read the handwriting | `POST /api/digitise` | `client.doc_ai.digitise` (Sarvam Vision, `content_type="mixed"`) |
-| 2. Structure the prescription | `POST /api/analyse` | `client.chat.completions` with `sarvam-105b` (JSON mode) |
-| 3. Translate | `POST /api/translate` | `client.text.translate` with `sarvam-translate:v1` |
+| 2. Structure the prescription and write the spoken script | `POST /api/analyse` | `client.chat.completions` with `sarvam-105b` (JSON mode) |
+| 3. Translate into everyday speech | `POST /api/translate` | `client.text.translate` with `mayura:v1`, `mode="modern-colloquial"` |
 | 4. Speak | `POST /api/speak` | `client.text_to_speech.convert` with `bulbul:v4-flash` |
 
-The browser runs these four steps in order, so the user sees real progress. If they switch language afterwards, only steps 3 and 4 run again.
+The browser runs these four steps in order, so the user sees real progress. If they switch language or voice afterwards, only steps 3 and 4 run again.
+
+### How the voice explanation is made
+
+The app explains the prescription the way a pharmacist would at the counter. It greets the patient by name and goes through each medicine in turn. It ties every dose to the daily routine ("1 tablet in the morning after food, and again at night after food, for 5 days"). It ends with a short recap grouped by time of day.
+
+- **No invented facts.** The script is assembled in code (`sahayak/text.py`) from the extracted facts, not written freely by an LLM. In testing, a free-form LLM script invented timings and stated what medicines were for. Building the script in code means doses, timings and durations can't be invented or dropped. If the time of day isn't written, the script says so and tells the patient to ask their pharmacist.
+- **Everyday speech.** Translation uses Sarvam's `mayura:v1` in modern-colloquial mode. This gives natural phrasing with the English words people actually use ("1 tablet सुबह खाने के बाद… 5 days तक लें"), and keeps medicine names exactly as written. The output is not formal textbook language.
+- **Voice-matched wording.** Where Sarvam documents a voice's gender, the translation uses matching first-person forms. If colloquial translation fails, the app falls back to `sarvam-translate:v1`.
 
 **Languages:** Hindi, English, Bengali, Marathi, Tamil, Telugu, Kannada, Gujarati, Punjabi, Malayalam and Odia. Bulbul v4 has no Malayalam or Odia voices yet, so those two use `bulbul:v3`.
 
@@ -36,6 +44,7 @@ The browser runs these four steps in order, so the user sees real progress. If t
 
 - **Camera-first input.** "Take photo" opens the phone's rear camera. Upload and drag-and-drop work on desktop.
 - **Photos are prepared in the browser.** Each photo is rotated upright and downscaled before upload, so uploads are fast and stay under the size limit.
+- **Conversational audio.** A warm, pharmacist-style explanation in everyday language, with a daily-routine recap at the end.
 - **Clear medicine cards.** Each card shows dose, how often, when (before or after food) and for how long. Diagnosis, tests, advice and follow-up appear below the cards.
 - **Uncertain readings are flagged.** Anything the model couldn't read clearly appears under "Please double-check with your pharmacist".
 - **Large audio player.** Download and native share (WhatsApp and similar apps) are built in, along with slow, normal and fast speaking speeds.

@@ -17,8 +17,8 @@ class FakePipeline:
     def structure(self, ocr_text):
         return Prescription(medicines=[Medicine(name="Dolo 650", dosage="1 tablet")])
 
-    def translate(self, text, target):
-        return f"[{target}] {text}"
+    def translate(self, text, target, speaker_gender=None):
+        return f"[{target}|{speaker_gender}] {text}"
 
     def synthesize(self, text, language, voice, pace=1.0):
         return b"ID3fake-mp3"
@@ -53,8 +53,10 @@ def test_full_flow(client):
     assert r.json()["prescription"]["medicines"][0]["name"] == "Dolo 650"
     summary = r.json()["summary"]
 
-    r = client.post("/api/translate", json={"text": summary, "target": "hi-IN"})
-    assert r.json()["text"].startswith("[hi-IN]")
+    assert summary.startswith("Namaste.") and "The first one is Dolo 650." in summary
+
+    r = client.post("/api/translate", json={"text": summary, "target": "hi-IN", "voice": "ritu_hi_medical"})
+    assert r.json()["text"].startswith("[hi-IN|Female]")
 
     r = client.post("/api/speak", json={"text": "नमस्ते", "language": "hi-IN"})
     assert r.status_code == 200 and r.headers["content-type"] == "audio/mpeg"
@@ -73,7 +75,7 @@ def test_rejects_unknown_voice_and_language(client):
 
 def test_sahayak_error_maps_to_502(monkeypatch):
     class Broken(FakePipeline):
-        def translate(self, text, target):
+        def translate(self, text, target, speaker_gender=None):
             raise SahayakError("Sarvam is down")
 
     monkeypatch.setattr(server, "get_pipeline", lambda: Broken())

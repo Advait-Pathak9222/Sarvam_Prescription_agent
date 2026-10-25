@@ -23,11 +23,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from sahayak import __version__, config  # noqa: E402
-from sahayak.config import LANGUAGES, LANGUAGES_BY_CODE, voice_label  # noqa: E402
+from sahayak.config import LANGUAGES, LANGUAGES_BY_CODE, voice_gender, voice_label  # noqa: E402
 from sahayak.errors import SahayakError  # noqa: E402
 from sahayak.media import prepare_document  # noqa: E402
 from sahayak.pipeline import PrescriptionPipeline  # noqa: E402
-from sahayak.text import build_patient_summary  # noqa: E402
+from sahayak.text import build_spoken_script  # noqa: E402
 
 ON_VERCEL = bool(os.getenv("VERCEL"))
 logging.basicConfig(level=logging.INFO)
@@ -110,6 +110,7 @@ class AnalyseRequest(BaseModel):
 class TranslateRequest(BaseModel):
     text: str = Field(min_length=1, max_length=config.MAX_TEXT_CHARS)
     target: str
+    voice: str | None = None  # lets first-person wording match the speaker's gender
 
 
 class SpeakRequest(BaseModel):
@@ -171,14 +172,15 @@ async def digitise(file: UploadFile = File(...), language: str = Form("en-IN")) 
 def analyse(body: AnalyseRequest) -> dict:
     """Step 2 — Sarvam LLM: structure OCR text into medicines, dosage, diagnosis."""
     prescription = get_pipeline().structure(body.ocr_text)
-    return {"prescription": prescription.to_dict(), "summary": build_patient_summary(prescription)}
+    return {"prescription": prescription.to_dict(), "summary": build_spoken_script(prescription)}
 
 
 @app.post("/api/translate")
 def translate(body: TranslateRequest) -> dict:
-    """Step 3 — Sarvam Translate: English summary to the patient's language."""
+    """Step 3 — Sarvam Translate: conversational script into the patient's everyday language."""
     _language(body.target)
-    return {"text": get_pipeline().translate(body.text, body.target), "language": body.target}
+    text = get_pipeline().translate(body.text, body.target, speaker_gender=voice_gender(body.voice))
+    return {"text": text, "language": body.target}
 
 
 @app.post("/api/speak")
