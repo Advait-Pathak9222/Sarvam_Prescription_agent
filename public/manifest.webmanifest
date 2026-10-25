@@ -1,0 +1,10 @@
+{
+  "name": "Prescription Sahayak",
+  "short_name": "Sahayak",
+  "description": "Understand your prescription in your own language.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7f6",
+  "theme_color": "#0f766e",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Prescription Sahayak — Understand your prescription in your language</title>
+  <meta name="description" content="Snap a photo of a handwritten prescription. Prescription Sahayak reads it, lists your medicines clearly, and reads the instructions aloud in 11 Indian languages.">
+  <meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1412" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Prescription Sahayak">
+  <meta property="og:description" content="Understand your doctor's prescription — read aloud in your own language.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-pill" viewBox="0 0 24 24"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></symbol>
+    <symbol id="i-languages" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></symbol>
+  </svg>
+
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="Prescription Sahayak home">
+        <img src="/favicon.svg" alt="" width="32" height="32">
+        <span>Prescription <strong>Sahayak</strong></span>
+      </a>
+      <span class="header-badge">Powered by Sarvam AI</span>
+    </div>
+  </header>
+
+  <main id="main" class="container">
+    <section class="hero">
+      <p class="eyebrow">Your prescription, explained</p>
+      <h1>Understand your doctor's prescription — in your own language.</h1>
+      <p class="lede">Take a photo of a handwritten prescription. We read it, list your medicines clearly, and read the instructions aloud in 11 Indian languages.</p>
+      <ul class="hero-points" aria-label="How it works">
+        <li><svg class="icon"><use href="#i-camera"/></svg>Snap or upload</li>
+        <li><svg class="icon"><use href="#i-pill"/></svg>See medicines &amp; dosage</li>
+        <li><svg class="icon"><use href="#i-volume"/></svg>Listen in your language</li>
+      </ul>
+    </section>
+
+    <form id="rx-form" class="card form-card" novalidate>
+      <section class="step" aria-labelledby="step1-title">
+        <div class="step-head">
+          <span class="step-num" aria-hidden="true">1</span>
+          <h2 id="step1-title">Add your prescription</h2>
+        </div>
+
+        <div id="dropzone" class="dropzone">
+          <div id="dz-empty" class="dz-empty">
+            <div class="dz-illustration" aria-hidden="true"><svg class="icon"><use href="#i-file"/></svg></div>
+            <p class="dz-title">Photograph the whole page in good light</p>
+            <p class="dz-sub">Keep the phone steady and avoid shadows for the best reading.</p>
+            <div class="dz-actions">
+              <label class="btn btn-primary" for="camera-input">
+                <svg class="icon"><use href="#i-camera"/></svg>Take photo
+              </label>
+              <label class="btn btn-secondary" for="file-input">
+                <svg class="icon"><use href="#i-upload"/></svg>Upload file
+              </label>
+            </div>
+            <p class="hint dz-drop-hint">or drag and drop a JPG, PNG or PDF here</p>
+          </div>
+
+          <div id="dz-preview" class="dz-preview" hidden>
+            <img id="preview-img" alt="Preview of your prescription" hidden>
+            <div id="preview-pdf" class="preview-pdf" hidden>
+              <svg class="icon"><use href="#i-file"/></svg><span>PDF document</span>
+            </div>
+            <div class="preview-bar">
+              <span id="file-name" class="file-name"></span>
+              <button type="button" id="change-file" class="btn btn-ghost btn-sm">
+                <svg class="icon"><use href="#i-refresh"/></svg>Change
+              </button>
+            </div>
+          </div>
+        </div>
+        <input id="camera-input" class="visually-hidden" type="file" accept="image/*" capture="environment" tabindex="-1">
+        <input id="file-input" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" tabindex="-1">
+        <p id="file-error" class="field-error" role="alert" hidden></p>
+      </section>
+
+      <section class="step" aria-labelledby="step2-title">
+        <div class="step-head">
+          <span class="step-num" aria-hidden="true">2</span>
+          <h2 id="step2-title">Choose how to listen</h2>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="language">Language</label>
+            <select id="language" disabled><option>Loading…</option></select>
+          </div>
+          <div class="field">
+            <label for="voice">Voice</label>
+            <select id="voice" disabled></select>
+            <p id="voice-hint" class="hint" hidden></p>
+          </div>
+        </div>
+        <fieldset class="field">
+          <legend>Speaking speed</legend>
+          <div class="segmented" role="radiogroup">
+            <label><input type="radio" name="pace" value="0.85"><span>Slow</span></label>
+            <label><input type="radio" name="pace" value="1" checked><span>Normal</span></label>
+            <label><input type="radio" name="pace" value="1.15"><span>Fast</span></label>
+          </div>
+        </fieldset>
+        <details class="advanced">
+          <summary>More options</summary>
+          <div class="field">
+            <label for="source-language">Prescription is written in</label>
+            <select id="source-language" disabled></select>
+            <p class="hint">Most prescriptions are written in English. Change this if yours is in another language.</p>
+          </div>
+        </details>
+      </section>
+
+      <button id="submit" type="submit" class="btn btn-primary btn-lg btn-block" disabled>
+        <span class="btn-label">Read my prescription</span>
+      </button>
+      <p class="privacy-note"><svg class="icon"><use href="#i-lock"/></svg>Your photo is processed securely and is never stored.</p>
+    </form>
+
+    <section id="progress" class="card progress-card" hidden aria-labelledby="progress-title">
+      <h2 id="progress-title" class="visually-hidden">Progress</h2>
+      <ol class="stepper">
+        <li data-step="digitise"><span class="dot" aria-hidden="true"></span><span class="label">Reading the handwriting</span></li>
+        <li data-step="analyse"><span class="dot" aria-hidden="true"></span><span class="label">Finding medicines and dosage</span></li>
+        <li data-step="translate"><span class="dot" aria-hidden="true"></span><span class="label">Translating into your language</span></li>
+        <li data-step="speak"><span class="dot" aria-hidden="true"></span><span class="label">Preparing the audio</span></li>
+      </ol>
+      <p id="progress-live" class="visually-hidden" aria-live="polite"></p>
+    </section>
+
+    <div id="error" class="alert alert-error" role="alert" hidden>
+      <svg class="icon"><use href="#i-alert"/></svg>
+      <div>
+        <p class="alert-title">We couldn't finish that</p>
+        <p id="error-message"></p>
+        <button type="button" id="retry" class="btn btn-secondary btn-sm">Try again</button>
+      </div>
+    </div>
+
+    <section id="results" class="results" hidden aria-labelledby="results-title">
+      <h2 id="results-title" class="visually-hidden">Your prescription</h2>
+
+      <article class="card listen-card">
+        <div class="listen-head">
+          <div>
+            <p class="eyebrow">Listen</p>
+            <h3 class="listen-title">Your prescription, read aloud</h3>
+          </div>
+          <div class="field compact">
+            <label for="result-language" class="visually-hidden">Change language</label>
+            <svg class="icon field-icon" aria-hidden="true"><use href="#i-languages"/></svg>
+            <select id="result-language"></select>
+          </div>
+        </div>
+
+        <div class="player" id="player">
+          <button type="button" id="play" class="play-btn" aria-label="Play">
+            <svg class="icon"><use href="#i-play"/></svg>
+          </button>
+          <div class="player-track">
+            <input id="seek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Seek">
+            <div class="player-times"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+          </div>
+          <audio id="audio" preload="auto"></audio>
+        </div>
+        <p id="listen-status" class="listen-status" hidden aria-live="polite"><span class="spinner" aria-hidden="true"></span><span></span></p>
+
+        <div id="summary" class="summary"></div>
+
+        <div class="row-actions">
+          <a id="download-audio" class="btn btn-secondary btn-sm" href="#" download><svg class="icon"><use href="#i-download"/></svg>Download audio</a>
+          <button type="button" id="copy-summary" class="btn btn-ghost btn-sm"><svg class="icon"><use href="#i-copy"/></svg><span>Copy text</span></button>
+          <button type="button" id="share" class="btn btn-ghost btn-sm" hidden><svg class="icon"><use href="#i-share"/></svg>Share</button>
+        </div>
+      </article>
+
+      <article class="card details-card">
+        <div class="details-head">
+          <div>
+            <p class="eyebrow">Prescription details</p>
+            <h3>Medicines <span id="med-count" class="count"></span></h3>
+          </div>
+        </div>
+        <dl id="meta" class="meta"></dl>
+        <div id="uncertain" class="alert alert-warn" hidden>
+          <svg class="icon"><use href="#i-alert"/></svg>
+          <div><p class="alert-title">Please double-check with your pharmacist</p><ul></ul></div>
+        </div>
+        <div id="medicines" class="med-grid"></div>
+        <div id="extras" class="extras"></div>
+        <details class="ocr">
+          <summary>View the text read from your image</summary>
+          <pre id="ocr-text"></pre>
+        </details>
+      </article>
+
+      <aside class="disclaimer">
+        <svg class="icon"><use href="#i-alert"/></svg>
+        <p><strong>This is not medical advice.</strong> AI can misread handwriting. Always confirm every medicine and dose with your doctor or pharmacist before taking it.</p>
+      </aside>
+
+      <button type="button" id="start-over" class="btn btn-secondary btn-block">
+        <svg class="icon"><use href="#i-refresh"/></svg>Read another prescription
+      </button>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>Prescription Sahayak uses Sarvam Vision, Sarvam LLM, Sarvam Translate and Bulbul voices.</p>
+      <p>For information only — not a substitute for professional medical advice.</p>
+    </div>
+  </footer>
+</body>
+</html>

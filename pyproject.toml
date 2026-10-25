@@ -1,0 +1,9 @@
+[project]
+name = "prescription-sahayak"
+version = "1.0.0"
+description = "Read handwritten prescriptions aloud in Indian languages with Sarvam AI."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,5 @@
+# Runtime dependencies (installed by Vercel for api/index.py)
+fastapi==0.161.1
+python-multipart==0.0.32
+sarvamai==0.1.37
+pillow==13.0.0
