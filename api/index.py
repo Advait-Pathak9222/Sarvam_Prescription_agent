@@ -13,6 +13,7 @@ import os
 import sys
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
@@ -54,6 +55,34 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None if ON_VERCEL else "/api/openapi.json",
 )
+
+
+class RestoreApiPathMiddleware:
+    """Recover the public /api/* path on Vercel.
+
+    vercel.json rewrites every /api/* request to this single function and passes the
+    original route as `__route`. Depending on the runtime, the app may see the rewrite
+    target (/api/index) or a prefix-stripped path, so normalise before routing.
+    """
+
+    def __init__(self, asgi_app) -> None:
+        self.app = asgi_app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path") or "/"
+            route = parse_qs(scope.get("query_string", b"").decode()).get("__route", [None])[0]
+            is_rewrite_target = path.rstrip("/") in ("/api/index", "/api/index.py", "/api", "")
+            if route is not None and (is_rewrite_target or not path.startswith("/api/")):
+                path = "/api/" + route.lstrip("/")
+            elif not path.startswith("/api/"):
+                path = "/api" + (path if path.startswith("/") else f"/{path}")
+            scope = {**scope, "path": path, "raw_path": path.encode()}
+        await self.app(scope, receive, send)
+
+
+if ON_VERCEL:
+    app.add_middleware(RestoreApiPathMiddleware)
 
 
 @lru_cache(maxsize=1)
@@ -161,6 +190,14 @@ def speak(body: SpeakRequest) -> Response:
         raise HTTPException(422, f"Voice '{voice}' is not available for {language.name}.")
     audio = get_pipeline().synthesize(body.text, language, voice, body.pace)
     return Response(audio, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
+
+if ON_VERCEL:
+
+    @app.api_route("/{full_path:path}", methods=["GET", "POST"], include_in_schema=False)
+    def _not_found(full_path: str) -> JSONResponse:
+        # Echo the routed path so misrouted requests are easy to diagnose in production.
+        return JSONResponse({"detail": "Not Found", "path": f"/{full_path}"}, status_code=404)
 
 
 # Local development: serve the static site from the same origin.

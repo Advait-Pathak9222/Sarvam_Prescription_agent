@@ -6,7 +6,7 @@
       "excludeFiles": "{tests/**,public/**,**/__pycache__/**,.env*}"
     }
   },
-  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index" }],
+  "rewrites": [{ "source": "/api/:path*", "destination": "/api/index?__route=:path*" }],
   "headers": [
     {
       "source": "/(.*)",
