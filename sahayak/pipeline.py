@@ -20,32 +20,60 @@ from .config import Language
 from .errors import SahayakError
 from .media import PreparedDocument
 from .models import Prescription
+from .normalize import normalize_prescription
 from .text import chunk_text, extract_json, split_paragraphs
 
 logger = logging.getLogger(__name__)
 
 STRUCTURE_SYSTEM_PROMPT = """\
-You are a careful clinical pharmacist assistant. You convert OCR text of an Indian medical \
-prescription into structured JSON for a patient who cannot read the handwriting.
+You are an experienced clinical pharmacist. You convert OCR text of a handwritten medical \
+prescription (India, or Commonwealth-style such as Kenya or the UK) into structured JSON for a \
+patient who cannot read the handwriting. The OCR comes from messy handwriting, so read it the \
+way a pharmacist would, but never invent anything.
 
-Rules:
-- Use ONLY information present in the text. Never invent medicines, doses, or diagnoses.
-- Correct obvious OCR misspellings of well-known drug names only when you are confident.
-- Rewrite shorthand in plain English, e.g. OD = once a day, BD/BID = twice a day, \
-TDS/TID = three times a day, QID = four times a day, HS = at bedtime, SOS = only when needed, \
-STAT = immediately, AC = before food, PC = after food, 1-0-1 = once in the morning and once at night, \
-1-1-1 = morning, afternoon and night, x 5d = for 5 days, Tab = tablet, Cap = capsule, Syp = syrup.
-- If a value is unclear or illegible, set it to null and describe the problem in "uncertain".
-- Write each "uncertain" item as one short, plain sentence a patient can understand when it is \
-read aloud, e.g. "How long to take Pantop is not written." or "The second medicine's name is hard \
-to read." Only include things that are genuinely unreadable or missing and matter for taking the \
-medicines; do not flag something that is written.
+Reading the prescription:
+- Every handwritten medicine line is one medicine, usually: name, strength, dose, frequency, \
+then an arrow (-> or →) followed by the duration. Include EVERY medicine line, even when parts \
+are unreadable. Never drop a line and never split one line into two medicines.
+- Printed form fields (surname, other names, D.O.B., registration number, address, department, \
+"Dispensed by", "Checked by", "Doctor's stamp", form codes like "AKUH 12") are not instructions. \
+A scribble near DATE or the signature is a date or signature, not a medicine: a short \
+all-capitals token followed by a date-like value at the very end (e.g. "HTHNS 4/12") is the \
+doctor's initials and the date.
+- Frequency shorthand: od / OD = once a day; bd / BD / BID = twice a day; tds / TDS / TID = three \
+times a day; qid / QID = four times a day; nocte / noct / HS = at night (bedtime); mane = in the \
+morning; prn / SOS = only when needed; stat = immediately; AC = before food; PC = after food; \
+"x" before a frequency means "times" or "for" (e.g. "x nocte" = at night). 1-0-1, 1-1-1, 0-0-1 \
+style counts mean morning-afternoon-night.
+- Dose shorthand: "T", "Tab", "i" or "i" with a dot = 1 tablet; "ii" = 2 tablets; "1/2" or "½" \
+before a form = half a tablet; Cap = capsule; Syp = syrup; "apply" = apply on the skin.
+- Duration shorthand (Commonwealth notation): N/7 = N days, N/52 = N weeks, N/12 = N months \
+(e.g. "-> 10/7" = for 10 days, "-> 2/52" = for 2 weeks, "-> 1/12" = for 1 month); \
+"wk" / "wks" = weeks; "5d" = 5 days.
+
+Common OCR misreads of handwriting (correct them):
+- "1/12" is often read as "4/2", "5/2", "Y/12", "4/12" or "1/2" right after an arrow. A duration \
+after an arrow ending in "/2" is almost certainly "/12" (months): treat "-> 4/2" as 1 month.
+- Handwritten "mg" is often read as "g". Tablets and capsules are almost never measured in grams, \
+so for a tablet or capsule read "10g" as "10 mg". Never output grams for a tablet or capsule.
+- "od" is often read as "as", "ds", "ad", "0d" or "o.d"; "nocte" as "Nacht", "Noct", "Nocti"; \
+"wk" as "um", "uk" or "wh".
+- Medicine names: correct to the real brand or generic name only when the name, strength and \
+dose clearly fit a known medicine (e.g. "Bulong 10" or "Amlong 10" = Amlong 10 mg); otherwise \
+keep the name as read.
+
+Output rules:
+- Use ONLY information in the text. Never invent medicines, doses, durations or diagnoses.
+- "diagnosis" only when a diagnosis is explicitly written (e.g. after "Dx", "Diagnosis", \
+"Imp" or "c/o"); otherwise []. A medicine name is never a diagnosis.
+- Every field must be plain English a patient understands ("1 tablet", "once a day", "at night", \
+"1 month"). Never copy raw shorthand such as "4/2", "x", "T", "as" or "10/7" into a field: \
+interpret it, or set the field to null if you cannot.
 - Fill "schedule" ONLY when the time of day is explicit: 1-0-1 or BD = ["morning", "night"]; \
-1-1-1 or TDS = ["morning", "afternoon", "night"]; 0-0-1 = ["night"]; 1-0-0 = ["morning"]; \
-HS = ["bedtime"]; a written time of day counts too. Otherwise leave it []. For example \
+1-1-1 or TDS = ["morning", "afternoon", "night"]; 0-0-1 = ["night"]; 1-0-0 or mane = ["morning"]; \
+nocte or HS = ["night"]; a written time of day counts too. Otherwise leave it []. For example \
 "Tab Pantop 40 OD AC (empty stomach)" has schedule [] because no time of day is written: \
 "before food" or "empty stomach" is NOT a time of day.
-- Ignore printed clinic boilerplate (phone numbers, registration numbers, addresses).
 
 Respond with a single JSON object and nothing else, using exactly this shape:
 {
@@ -60,18 +88,17 @@ Respond with a single JSON object and nothing else, using exactly this shape:
       "name": string,            // brand or generic name, e.g. "Paracetamol"
       "strength": string | null, // e.g. "500 mg"
       "dosage": string | null,   // amount per dose, e.g. "1 tablet", "5 ml"
-      "frequency": string | null,// plain English, e.g. "twice a day (morning and night)"
-      "timing": string | null,   // e.g. "after food"
-      "duration": string | null, // e.g. "5 days"
+      "frequency": string | null,// plain English, e.g. "once a day", "twice a day"
+      "timing": string | null,   // e.g. "after food", "at night"
+      "duration": string | null, // e.g. "5 days", "2 weeks", "1 month"
       "instructions": string | null,
       "schedule": [string],      // times of day, only from: "morning", "afternoon", "evening", "night", "bedtime"
-      "as_needed": boolean       // true only for SOS / "when needed" medicines
+      "as_needed": boolean       // true only for SOS / PRN / "when needed" medicines
     }
   ],
   "tests": [string],
   "advice": [string],
-  "follow_up": string | null,
-  "uncertain": [string]
+  "follow_up": string | null
 }"""
 
 
@@ -182,7 +209,7 @@ class PrescriptionPipeline:
             # Never log the content itself: it is patient health information.
             logger.warning("Unparseable LLM output (%d chars)", len(content or ""))
             raise SahayakError("The prescription couldn't be analysed. Please try again.") from exc
-        return Prescription.from_dict(data)
+        return normalize_prescription(Prescription.from_dict(data), ocr_text)
 
     # 3. Translation -----------------------------------------------------------
     def translate(self, text: str, target: str, speaker_gender: str | None = None) -> str:

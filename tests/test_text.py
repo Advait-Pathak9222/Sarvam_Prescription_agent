@@ -90,7 +90,7 @@ def test_spoken_script_is_conversational_and_faithful():
     recap = next(p for p in paragraphs if p.startswith("Let me repeat it once"))
     assert "In the morning, after food, take Dolo 650. Also take Ascoril LS." in recap
     assert "Pantop" not in recap
-    assert "Take Ondem only when you need it." in recap
+    assert "Use Ondem only when you need it." in recap
     assert paragraphs[-1].endswith("get well soon.")
     assert " mg" not in script and " ml" not in script
 
@@ -100,8 +100,7 @@ def test_spoken_script_handles_missing_details():
     script = build_spoken_script(rx)
     assert script.startswith("Namaste. I have gone through your prescription")
     assert "You have one medicine." in script
-    assert "The amount is not clear on the prescription" in script
-    assert "How often to take it is not clear" in script
+    assert "Please ask your pharmacist to confirm how much to take and how often to take it" in script
     assert "Let me repeat it once" not in script
 
 

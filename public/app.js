@@ -527,7 +527,8 @@
           el("h4", { class: "med-name", text: med.name }),
           med.strength && el("p", { class: "med-strength", text: med.strength }))),
       facts.length && el("dl", { class: "med-facts" }, facts.map(([k, v]) => el("div", {}, el("dt", { text: k }), el("dd", { text: v })))),
-      med.instructions && el("p", { class: "med-note", text: med.instructions }));
+      med.instructions && el("p", { class: "med-note", text: med.instructions }),
+      med.unclear && el("p", { class: "med-note med-warn" }, icon("alert"), el("span", { text: med.unclear })));
   }
 
   function chipSection(title, items) {

@@ -36,6 +36,18 @@ The app explains the prescription the way a pharmacist would at the counter. It 
 
 - **No invented facts.** The script is assembled in code (`sahayak/text.py`) from the extracted facts, not written freely by an LLM. In testing, a free-form LLM script invented timings and stated what medicines were for. Building the script in code means doses, timings and durations can't be invented or dropped. If the time of day isn't written, the script says so and tells the patient to ask their pharmacist.
 - **Everyday speech.** Translation uses Sarvam's `mayura:v1` in modern-colloquial mode. This gives natural phrasing with the English words people actually use ("1 tablet सुबह खाने के बाद… 5 days तक लें"), and keeps medicine names exactly as written. The output is not formal textbook language.
+- **Messy handwriting and shorthand.** The structuring step knows Indian and Commonwealth prescription notation, including:
+  - durations: `10/7` = 10 days, `2/52` = 2 weeks, `1/12` = 1 month
+  - frequencies: `od`, `bd`, `tds`, `nocte`, `prn`
+  - doses: `T`/`i̇` = 1 tablet
+
+  It also knows typical OCR misreads, such as `mg` read as `g`, `1/12` as `4/2`, `od` as `as`, and `nocte` as `Nacht`. A code safety net (`sahayak/normalize.py`) then makes sure:
+  - raw shorthand and implausible values never reach the patient
+  - a tablet is never spoken in grams
+  - durations are spelled out
+  - legibility is checked against the OCR text
+
+  A corrected name, a changed strength unit or a misread duration triggers a short "please ask your pharmacist to confirm…". A clearly written prescription never gets false warnings.
 - **Voice-matched wording.** Where Sarvam documents a voice's gender, the translation uses matching first-person forms. If colloquial translation fails, the app falls back to `sarvam-translate:v1`.
 
 **Languages:** Hindi, English, Bengali, Marathi, Tamil, Telugu, Kannada, Gujarati, Punjabi, Malayalam and Odia. Bulbul v4 has no Malayalam or Odia voices yet, so those two use `bulbul:v3`.

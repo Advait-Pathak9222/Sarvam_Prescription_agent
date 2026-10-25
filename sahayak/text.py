@@ -6,7 +6,8 @@ import json
 import re
 from typing import Any
 
-from .models import SCHEDULE_SLOTS, Medicine, Prescription
+from .models import SCHEDULE_SLOTS, UNSURE_FIELDS, Medicine, Prescription
+from .normalize import TOPICAL_WORDS, is_food_timing
 
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
@@ -17,6 +18,8 @@ _SPEAKABLE = (
     (re.compile(r"(?<=\d)\s*mcg\b", re.IGNORECASE), " microgram"),
     (re.compile(r"(?<=\d)\s*mg\b", re.IGNORECASE), " milligram"),
     (re.compile(r"(?<=\d)\s*ml\b", re.IGNORECASE), " millilitre"),
+    (re.compile(r"(?<=\d)\s*(?:gm|gms|g)\b", re.IGNORECASE), " gram"),
+    (re.compile(r"(?<=\d)\s*iu\b", re.IGNORECASE), " units"),
     (re.compile(r"\s+/\s+"), " or "),
 )
 
@@ -29,6 +32,13 @@ _SLOT_PHRASES = {
     "bedtime": "at bedtime",
 }
 _FOOD_GROUPS = ("before food", "after food", "food timing not written")
+_UNSURE_PHRASES = {
+    "name": "the name",
+    "strength": "the strength",
+    "dose": "how much to take",
+    "frequency": "how often to take it",
+    "duration": "how long to take it",
+}
 
 
 def extract_json(text: str) -> dict[str, Any]:
@@ -140,7 +150,9 @@ def daily_routine(rx: Prescription) -> dict[str, dict[str, list[str]]]:
     return {slot: routine[slot] for slot in SCHEDULE_SLOTS if slot in routine}
 
 
-def _medicine_paragraph(index: int, med: Medicine) -> str:
+def _medicine_paragraph(index: int, med: Medicine, *, brief: bool = False) -> str:
+    """One medicine, spoken. `brief` shortens the confirm-with-pharmacist sentence when the
+    whole prescription has already been flagged as hard to read."""
     opener = f"The {_ORDINALS[index]} one is" if index < len(_ORDINALS) else "Next is"
     title = med.name
     # Skip strength when the name already carries it ("Dolo 650" + "650 mg").
@@ -148,7 +160,10 @@ def _medicine_paragraph(index: int, med: Medicine) -> str:
         title += f", {med.strength}"
     sentences = [f"{opener} {title}."]
 
-    food = _food_phrase(med.timing)
+    # Food timing ("after food") is tied to each time of day; other timing text ("at night")
+    # only stands in for a missing frequency, so it is never said twice.
+    food = _food_phrase(med.timing) if is_food_timing(med.timing) else None
+    other_time = None if food else _food_phrase(med.timing)
     if med.as_needed:
         when = ", ".join(p for p in ("only when you need it", food) if p)
     elif med.schedule:
@@ -157,23 +172,58 @@ def _medicine_paragraph(index: int, med: Medicine) -> str:
         slots = [_SLOT_PHRASES[s] + (f" {food}" if food else "") for s in med.schedule]
         when = slots[0] if len(slots) == 1 else f"{', '.join(slots[:-1])}, and again {slots[-1]}"
     else:
-        when = ", ".join(p for p in (med.frequency, food) if p)
-    take = f"Take {med.dosage or 'it'}"
-    sentences.append(_sentence(f"{take} {when}" if when else take))
+        when = ", ".join(p for p in (med.frequency or other_time, food) if p)
+    topical = _is_topical(med)
+    if topical:
+        sentences.append(_sentence(f"Apply it on the skin {when}".strip()))
+    elif med.dosage or when:
+        sentences.append(_sentence(f"Take {med.dosage or 'it'} {when}".strip()))
     if med.duration:
         # Its own sentence, so translation can't attach it to just one of the times above.
-        sentences.append(_sentence(f"Take it for {med.duration}"))
+        sentences.append(_sentence(f"{'Use' if topical else 'Take'} it for {med.duration}"))
 
-    if not med.dosage:
-        sentences.append("The amount is not clear on the prescription, so please check with your pharmacist.")
-    if not med.as_needed and not med.schedule:
-        if med.frequency:
-            sentences.append("The time of day is not written, so please ask your pharmacist when to take it.")
+    # The doctor's own instructions belong with the dosing, before any "please confirm".
+    instructions = (med.instructions or "").strip(". ")
+    if instructions and instructions.lower() != (med.dosage or "").lower() and not (
+        topical and instructions.lower().startswith("apply")
+    ):
+        sentences.append(_sentence(_capitalize(_food_phrase(instructions) or instructions)))
+
+    # One sentence covering everything missing or guessed, instead of a warning per field.
+    unsure = set(med.unsure)
+    if not med.dosage and not topical:
+        unsure.add("dose")
+    if not (med.as_needed or med.schedule or med.frequency or other_time):
+        unsure.add("frequency")
+    if topical:
+        unsure -= {"dose", "strength"}
+    if med.as_needed:
+        unsure.discard("frequency")
+    phrases = [
+        "how long to use it" if topical and f == "duration" else _UNSURE_PHRASES[f]
+        for f in UNSURE_FIELDS
+        if f in unsure
+    ]
+    if phrases:
+        if brief:
+            sentences.append(f"Please ask your pharmacist to confirm {_join(phrases)}.")
         else:
-            sentences.append("How often to take it is not clear, so please check with your pharmacist.")
-    if med.instructions:
-        sentences.append(_sentence(med.instructions))
+            pronoun = "it was" if len(phrases) == 1 else "they were"
+            sentences.append(
+                f"Please ask your pharmacist to confirm {_join(phrases)}, as {pronoun} hard to read on the prescription."
+            )
+    elif not med.as_needed and not med.schedule:
+        sentences.append("The time of day is not written, so please ask your pharmacist when to take it.")
     return " ".join(sentences)
+
+
+def _is_topical(med: Medicine) -> bool:
+    text = f"{med.name} {med.dosage or ''} {med.instructions or ''}".lower()
+    return any(word in text for word in TOPICAL_WORDS)
+
+
+def _capitalize(text: str) -> str:
+    return text[:1].upper() + text[1:]
 
 
 def _recap_paragraph(rx: Prescription) -> str | None:
@@ -197,7 +247,7 @@ def _recap_paragraph(rx: Prescription) -> str | None:
                 sentences.append(f"{lead}, {group}, take {_join(names)}.")
             first = False
     if as_needed:
-        sentences.append(f"Take {_join(as_needed)} only when you need it.")
+        sentences.append(f"Use {_join(as_needed)} only when you need it.")
     return " ".join(sentences)
 
 
@@ -218,6 +268,11 @@ def build_spoken_script(rx: Prescription) -> str:
     intro = [greeting, f"I have gone through {source}, and I will explain it to you slowly."]
     if rx.diagnosis:
         intro.append(_sentence(f"The doctor has written {_join([_lower_first(d) for d in rx.diagnosis])}"))
+    hard_to_read = rx.hard_to_read
+    if hard_to_read:
+        intro.append(
+            "This prescription is quite hard to read, so please go through it with your pharmacist as well."
+        )
     paragraphs.append(" ".join(intro))
 
     count = len(rx.medicines)
@@ -227,7 +282,9 @@ def build_spoken_script(rx: Prescription) -> str:
         paragraphs.append("You have one medicine.")
     else:
         paragraphs.append(f"You have {count} medicines. Let us go through them one by one.")
-    paragraphs.extend(_medicine_paragraph(i, med) for i, med in enumerate(rx.medicines))
+    paragraphs.extend(
+        _medicine_paragraph(i, med, brief=hard_to_read) for i, med in enumerate(rx.medicines)
+    )
 
     extras = []
     if rx.tests:

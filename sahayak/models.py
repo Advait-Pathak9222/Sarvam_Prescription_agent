@@ -7,6 +7,8 @@ from typing import Any
 
 # Times of day a dose can be tied to; used for the spoken daily-routine recap.
 SCHEDULE_SLOTS = ("morning", "afternoon", "evening", "night", "bedtime")
+# Medicine fields the reader can flag as corrected or guessed from messy handwriting.
+UNSURE_FIELDS = ("name", "strength", "dose", "frequency", "duration")
 
 
 def _opt_str(value: Any) -> str | None:
@@ -37,6 +39,8 @@ class Medicine:
     instructions: str | None = None
     schedule: list[str] = field(default_factory=list)  # subset of SCHEDULE_SLOTS
     as_needed: bool = False
+    unsure: list[str] = field(default_factory=list)  # fields the reader guessed; subset of UNSURE_FIELDS
+    unclear: str | None = None  # patient-facing note built from `unsure` (see normalize.py)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Medicine | None":
@@ -56,6 +60,10 @@ class Medicine:
                 if slot in SCHEDULE_SLOTS
             ],
             as_needed=data.get("as_needed") is True,
+            unsure=[
+                f for f in dict.fromkeys(s.lower() for s in _str_list(data.get("unsure")))
+                if f in UNSURE_FIELDS
+            ],
         )
 
 
@@ -71,7 +79,8 @@ class Prescription:
     tests: list[str] = field(default_factory=list)
     advice: list[str] = field(default_factory=list)
     follow_up: str | None = None
-    uncertain: list[str] = field(default_factory=list)
+    uncertain: list[str] = field(default_factory=list)  # general notes, set in normalize.py
+    hard_to_read: bool = False  # set in normalize.py by checking the result against the OCR
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Prescription":
