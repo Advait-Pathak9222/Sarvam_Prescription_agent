@@ -36,6 +36,10 @@ TDS/TID = three times a day, QID = four times a day, HS = at bedtime, SOS = only
 STAT = immediately, AC = before food, PC = after food, 1-0-1 = once in the morning and once at night, \
 1-1-1 = morning, afternoon and night, x 5d = for 5 days, Tab = tablet, Cap = capsule, Syp = syrup.
 - If a value is unclear or illegible, set it to null and describe the problem in "uncertain".
+- Write each "uncertain" item as one short, plain sentence a patient can understand when it is \
+read aloud, e.g. "How long to take Pantop is not written." or "The second medicine's name is hard \
+to read." Only include things that are genuinely unreadable or missing and matter for taking the \
+medicines; do not flag something that is written.
 - Fill "schedule" ONLY when the time of day is explicit: 1-0-1 or BD = ["morning", "night"]; \
 1-1-1 or TDS = ["morning", "afternoon", "night"]; 0-0-1 = ["night"]; 1-0-0 = ["morning"]; \
 HS = ["bedtime"]; a written time of day counts too. Otherwise leave it []. For example \
